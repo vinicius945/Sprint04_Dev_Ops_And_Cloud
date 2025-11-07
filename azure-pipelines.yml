@@ -1,0 +1,56 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main   # dispara o pipeline a cada push na branch main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  # Variáveis fixas do ambiente
+  AZURE_WEBAPP_NAME: 'webapp-challenge-945-sprint4'
+  AZURE_RESOURCE_GROUP: 'rg-challenge-sprint4'
+  JAVA_VERSION: '17'
+  ARTIFACT_NAME: 'app-sprint4'
+  PACKAGE_PATH: 'target/*.jar'
+
+steps:
+# 1️⃣ Checkout do código do GitHub
+- checkout: self
+  displayName: 'Clonar código-fonte'
+
+# 2️⃣ Instalar Java
+- task: UseJavaVersion@1
+  inputs:
+    versionSpec: '$(JAVA_VERSION)'
+  displayName: 'Instalar Java $(JAVA_VERSION)'
+
+# 3️⃣ Build e Testes com Maven
+- task: Maven@3
+  inputs:
+    mavenPomFile: 'pom.xml'
+    goals: 'clean package'
+    publishJUnitResults: true
+    testResultsFiles: '**/surefire-reports/TEST-*.xml'
+  displayName: 'Compilar e testar aplicação (Maven)'
+
+# 4️⃣ Publicar artefato (.jar)
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(PACKAGE_PATH)'
+    ArtifactName: '$(ARTIFACT_NAME)'
+  displayName: 'Publicar artefato .jar'
+
+# 5️⃣ Deploy no Azure Web App
+- task: AzureWebApp@1
+  displayName: 'Deploy automático no Azure Web App $(AZURE_WEBAPP_NAME)'
+  inputs:
+    azureSubscription: 'connection-sprint4'   # nome da sua service connection
+    appType: 'webAppLinux'
+    appName: '$(AZURE_WEBAPP_NAME)'
+    package: '$(Pipeline.Workspace)/$(ARTIFACT_NAME)/**/*.jar'
+    runtimeStack: 'JAVA|17-java17'
+    startupCommand: 'java -jar /home/site/wwwroot/*.jar'
