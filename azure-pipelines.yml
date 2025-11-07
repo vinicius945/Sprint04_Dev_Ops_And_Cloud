@@ -22,10 +22,12 @@ steps:
 - checkout: self
   displayName: 'Clonar código-fonte'
 
-# 2️⃣ Instalar Java
-- task: UseJavaVersion@1
+# 2️⃣ Instalar Java (task atualizada)
+- task: JavaToolInstaller@0
   inputs:
     versionSpec: '$(JAVA_VERSION)'
+    jdkArchitecture: 'x64'
+    jdkSourceOption: 'PreInstalled'
   displayName: 'Instalar Java $(JAVA_VERSION)'
 
 # 3️⃣ Build e Testes com Maven
