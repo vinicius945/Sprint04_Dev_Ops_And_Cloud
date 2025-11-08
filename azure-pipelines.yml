@@ -1,5 +1,3 @@
-# azure-pipelines.yml (Versão FINAL - Alinhada com os Requisitos da Sprint 4)
-
 trigger:
   - master  # 1. ATENÇÃO: Gatilho na branch 'master' (Requisito 7-II do PDF)
 
