@@ -1,4 +1,4 @@
-# azure-pipelines.yml (Versão FINAL 5.0 - Correção do 'mavenPomFile' e 'workingDirectory')
+# azure-pipelines.yml (Versão FINAL 6.0 - Correção do 'PathtoPublish')
 
 trigger:
   - main  # 1. Gatilho na branch 'main'
@@ -20,8 +20,8 @@ variables:
   ACR_LOGIN_SERVER: 'acrchallenge945sprint4.azurecr.io'
 
   # 6. Nomes das Service Connections
-  ACR_SERVICE_CONNECTION: 'connection-acr'       # Conexão do tipo "Docker Registry"
-  AZURE_SERVICE_CONNECTION: 'connection-sprint4' # Conexão do tipo "Azure Resource Manager"
+  ACR_SERVICE_CONNECTION: 'connection-acr'
+  AZURE_SERVICE_CONNECTION: 'connection-sprint4'
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -49,14 +49,12 @@ stages:
           - task: Maven@3
             displayName: 'Compilar e Testar (Maven)'
             inputs:
-              # Caminho COMPLETO para o pom.xml a partir da raiz
-              mavenPomFile: '$(PROJECT_SUBDIRECTORY)/pom.xml' # <-- Caminho correto do pom.xml
-              # Diretório onde o Maven deve EXECUTAR
-              workingDirectory: '$(PROJECT_SUBDIRECTORY)' # <-- Pasta do projeto
+              mavenPomFile: '$(PROJECT_SUBDIRECTORY)/pom.xml'
+              workingDirectory: '$(PROJECT_SUBDIRECTORY)'
               goals: 'clean package'
               publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
-            env: # <-- A SOLUÇÃO: Passa os segredos para os testes
+            env:
               SPRING_DATASOURCE_URL: $(SPRING_DATASOURCE_URL)
               SPRING_DATASOURCE_USERNAME: $(SPRING_DATASOURCE_USERNAME)
               SPRING_DATASOURCE_PASSWORD: $(SPRING_DATASOURCE_PASSWORD)
@@ -82,11 +80,14 @@ stages:
                 $(Build.BuildId)
                 latest
 
-          # Publica o artefato .jar (Este agora vai funcionar)
+          # -----------------------------------------------------------------
+          # AQUI ESTÁ A CORREÇÃO (Publicar Artefato)
+          # -----------------------------------------------------------------
           - task: PublishBuildArtifacts@1
             displayName: 'Publicar Artefato (.jar)'
             inputs:
-              PathtoPublish: '$(PROJECT_SUBDIRECTORY)/target/*.jar' # <-- Este caminho está correto
+              # Em vez de procurar por '*.jar', publicamos a pasta 'target' inteira
+              PathtoPublish: '$(PROJECT_SUBDIRECTORY)/target' # <-- CORREÇÃO
               ArtifactName: 'app-jar'
               publishLocation: 'Container'
 
