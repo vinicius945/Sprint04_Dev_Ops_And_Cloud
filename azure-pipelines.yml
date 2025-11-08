@@ -20,8 +20,8 @@ variables:
   ACR_LOGIN_SERVER: 'acrchallenge945sprint4.azurecr.io'
 
   # 6. Nomes das Service Connections
-  ACR_SERVICE_CONNECTION: 'connection-acr'
-  AZURE_SERVICE_CONNECTION: 'connection-sprint4'
+  ACR_SERVICE_CONNECTION: 'connection-acr'       # Conexão do tipo "Docker Registry"
+  AZURE_SERVICE_CONNECTION: 'connection-sprint4' # Conexão do tipo "Azure Resource Manager"
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -42,34 +42,32 @@ stages:
             displayName: 'Instalar Java $(JAVA_VERSION)'
             inputs:
               versionSpec: '$(JAVA_VERSION)'
-              jdkArchitectureOption: 'x64'
+              jdkArchitectureOption: 'x64' # <-- Correção do erro 'Input required'
               jdkSourceOption: 'PreInstalled'
 
-          # -----------------------------------------------------------------
-          # AQUI ESTÁ A CORREÇÃO (mavenPomFile e workingDirectory)
-          # -----------------------------------------------------------------
+          # Roda o Maven (Com todas as correções)
           - task: Maven@3
             displayName: 'Compilar e Testar (Maven)'
             inputs:
               # Caminho COMPLETO para o pom.xml a partir da raiz
-              mavenPomFile: '$(PROJECT_SUBDIRECTORY)/pom.xml' # <-- CORREÇÃO
+              mavenPomFile: '$(PROJECT_SUBDIRECTORY)/pom.xml' # <-- Correção do 'Not found mavenPOMFile'
               # Diretório onde o Maven deve EXECUTAR
-              workingDirectory: '$(PROJECT_SUBDIRECTORY)' # <-- CORRETO
+              workingDirectory: '$(PROJECT_SUBDIRECTORY)' # <-- Correto
               goals: 'clean package'
               publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
-            env:
+            env: # <-- Correção do 'BUILD FAILURE' (MojoFailureException)
               SPRING_DATASOURCE_URL: $(SPRING_DATASOURCE_URL)
               SPRING_DATASOURCE_USERNAME: $(SPRING_DATASOURCE_USERNAME)
               SPRING_DATASOURCE_PASSWORD: $(SPRING_DATASOURCE_PASSWORD)
               SPRING_DATASOURCE_DRIVER_CLASS_NAME: 'com.microsoft.sqlserver.jdbc.SQLServerDriver'
 
-          # Login no ACR
+          # Login no ACR (Usando a conexão 'Docker Registry')
           - task: Docker@2
             displayName: 'Login no ACR'
             inputs:
               command: 'login'
-              containerRegistry: '$(ACR_SERVICE_CONNECTION)'
+              containerRegistry: '$(ACR_SERVICE_CONNECTION)' # <-- Correção do 'Docker registry service connection'
 
           # Build e Push da Imagem Docker
           - task: Docker@2
@@ -84,11 +82,11 @@ stages:
                 $(Build.BuildId)
                 latest
 
-          # Publica o artefato .jar
+          # Publica o artefato .jar (Este agora vai funcionar)
           - task: PublishBuildArtifacts@1
             displayName: 'Publicar Artefato (.jar)'
             inputs:
-              PathtoPublish: '$(PROJECT_SUBDIRECTORY)/target/*.jar'
+              PathtoPublish: '$(PROJECT_SUBDIRECTORY)/target/*.jar' # <-- Este caminho está correto
               ArtifactName: 'app-jar'
               publishLocation: 'Container'
 
