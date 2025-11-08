@@ -1,4 +1,4 @@
-# azure-pipelines.yml (Versão FINAL 4.0 - Correção do 'mavenPomFile')
+# azure-pipelines.yml (Versão FINAL 5.0 - Correção do 'mavenPomFile' e 'workingDirectory')
 
 trigger:
   - main  # 1. Gatilho na branch 'main'
@@ -7,8 +7,6 @@ variables:
   # 2. Configuração do Projeto Java
   JAVA_VERSION: '17'
   PROJECT_SUBDIRECTORY: 'Challenge_Java_2025_Sprint4-main'
-  # Esta variável de MAVEN_POM_FILE não é mais necessária, mas vamos mantê-la
-  MAVEN_POM_FILE: 'Challenge_Java_2025_Sprint4-main/pom.xml'
 
   # 3. Configuração do Docker
   DOCKERFILE_PATH: 'Challenge_Java_2025_Sprint4-main/Dockerfile'
@@ -48,14 +46,15 @@ stages:
               jdkSourceOption: 'PreInstalled'
 
           # -----------------------------------------------------------------
-          # AQUI ESTÁ A CORREÇÃO (mavenPomFile)
+          # AQUI ESTÁ A CORREÇÃO (mavenPomFile e workingDirectory)
           # -----------------------------------------------------------------
           - task: Maven@3
             displayName: 'Compilar e Testar (Maven)'
             inputs:
-              # O 'mavenPomFile' deve ser relativo ao 'workingDirectory'
-              mavenPomFile: 'pom.xml' # <-- CORREÇÃO: Removido o caminho longo
-              workingDirectory: '$(PROJECT_SUBDIRECTORY)' # <-- Correto: Entra na pasta do projeto
+              # Caminho COMPLETO para o pom.xml a partir da raiz
+              mavenPomFile: '$(PROJECT_SUBDIRECTORY)/pom.xml' # <-- CORREÇÃO
+              # Diretório onde o Maven deve EXECUTAR
+              workingDirectory: '$(PROJECT_SUBDIRECTORY)' # <-- CORRETO
               goals: 'clean package'
               publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
@@ -85,11 +84,10 @@ stages:
                 $(Build.BuildId)
                 latest
 
-          # Publica o artefato .jar (Este agora vai funcionar)
+          # Publica o artefato .jar
           - task: PublishBuildArtifacts@1
             displayName: 'Publicar Artefato (.jar)'
             inputs:
-              # Este caminho estava correto, pois é relativo ao root do repo
               PathtoPublish: '$(PROJECT_SUBDIRECTORY)/target/*.jar'
               ArtifactName: 'app-jar'
               publishLocation: 'Container'
