@@ -1,58 +1,69 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
+# azure-pipelines.yml (Versão FINAL - Alinhada com os Requisitos da Sprint 4)
 
 trigger:
-- main   # dispara o pipeline a cada push na branch main
-
-pool:
-  vmImage: ubuntu-latest
+  - master  # 1. ATENÇÃO: Gatilho na branch 'master' (Requisito 7-II do PDF)
 
 variables:
-  # Variáveis fixas do ambiente
+  # 2. Configuração do Projeto Java
+  JAVA_VERSION: '17'
+  PROJECT_SUBDIRECTORY: 'Challenge_Java_2025_Sprint4-main'
+  MAVEN_POM_FILE: 'Challenge_Java_2025_Sprint4-main/pom.xml'
+
+  # 3. Configuração do Docker
+  DOCKERFILE_PATH: 'Challenge_Java_2025_Sprint4-main/Dockerfile'
+  IMAGE_NAME: 'gestaofrota-challenge'
+
+  # 4. Nomes dos Recursos do Azure (do seu script)
   AZURE_WEBAPP_NAME: 'webapp-challenge-945-sprint4'
   AZURE_RESOURCE_GROUP: 'rg-challenge-sprint4'
-  JAVA_VERSION: '17'
-  ARTIFACT_NAME: 'app-sprint4'
-  PACKAGE_PATH: 'target/*.jar'
 
-steps:
-# 1️⃣ Checkout do código do GitHub
-- checkout: self
-  displayName: 'Clonar código-fonte'
+  # 5. Nomes do ACR (que criamos)
+  ACR_LOGIN_SERVER: 'acrchallenge945sprint4.azurecr.io'
 
-# 2️⃣ Instalar Java (task atualizada)
-- task: JavaToolInstaller@0
-  inputs:
-    versionSpec: '$(JAVA_VERSION)'
-    jdkArchitecture: 'x64'
-    jdkSourceOption: 'PreInstalled'
-  displayName: 'Instalar Java $(JAVA_VERSION)'
+  # 6. Nomes das Service Connections (que você criou)
+  ACR_SERVICE_CONNECTION: 'connection-acr'
+  AZURE_SERVICE_CONNECTION: 'connection-sprint4'
 
-# 3️⃣ Build e Testes com Maven
-- task: Maven@3
-  inputs:
-    mavenPomFile: 'pom.xml'
-    goals: 'clean package'
-    publishJUnitResults: true
-    testResultsFiles: '**/surefire-reports/TEST-*.xml'
-  displayName: 'Compilar e testar aplicação (Maven)'
+pool:
+  vmImage: 'ubuntu-latest'
 
-# 4️⃣ Publicar artefato (.jar)
-- task: PublishBuildArtifacts@1
-  inputs:
-    PathtoPublish: '$(PACKAGE_PATH)'
-    ArtifactName: '$(ARTIFACT_NAME)'
-  displayName: 'Publicar artefato .jar'
+# --- A PIPELINE É DIVIDIDA EM ESTÁGIOS (CI e CD) ---
+stages:
 
-# 5️⃣ Deploy no Azure Web App
-- task: AzureWebApp@1
-  displayName: 'Deploy automático no Azure Web App $(AZURE_WEBAPP_NAME)'
-  inputs:
-    azureSubscription: 'connection-sprint4'   # nome da sua service connection
-    appType: 'webAppLinux'
-    appName: '$(AZURE_WEBAPP_NAME)'
-    package: '$(Pipeline.Workspace)/$(ARTIFACT_NAME)/**/*.jar'
-    runtimeStack: 'JAVA|17-java17'
-    startupCommand: 'java -jar /home/site/wwwroot/*.jar'
+  # 7. ESTÁGIO DE CI (Build, Teste e Push da Imagem)
+  - stage: CI_Build
+    displayName: 'Estágio 1: Build, Teste e Push da Imagem'
+    jobs:
+      - job: Build
+        displayName: 'Build, Test e Docker Push'
+        steps:
+
+          # Instala o Java 17
+          - task: JavaToolInstaller@0
+            displayName: 'Instalar Java $(JAVA_VERSION)'
+            inputs:
+              versionSpec: '$(JAVA_VERSION)'
+              jdkArchitecture: 'x64'
+              jdkSourceOption: 'PreInstalled'
+
+          # Roda o Maven (clean, package, tests)
+          # Define o workingDirectory para a subpasta do seu projeto
+          - task: Maven@3
+            displayName: 'Compilar e Testar (Maven)'
+            inputs:
+              mavenPomFile: '$(MAVEN_POM_FILE)'
+              workingDirectory: '$(PROJECT_SUBDIRECTORY)' # <--- Importante
+              goals: 'clean package'
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml' # <--- Cumpre o requisito 7-VI
+
+          # Login no Azure Container Registry (ACR)
+          - task: Docker@2
+            displayName: 'Login no ACR'
+            inputs:
+              command: 'login'
+              containerRegistry: '$(ACR_SERVICE_CONNECTION)'
+
+          # Build da imagem Docker e Push para o ACR
+          - task: Docker@2
+            displayName: 'Build e Push da Imagem Docker'
