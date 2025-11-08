@@ -1,7 +1,7 @@
 # azure-pipelines.yml (Versão CORRIGIDA - Alinhada com os Requisitos da Sprint 4)
 
 trigger:
-  - main  # 1. Gatilho na branch 'main' (conforme sua verificação)
+  - main  # 1. Gatilho na branch 'main'
 
 variables:
   # 2. Configuração do Projeto Java
@@ -38,12 +38,14 @@ stages:
         displayName: 'Build, Test e Docker Push'
         steps:
 
-          # Instala o Java 17
+          # -----------------------------------------------------------------
+          # AQUI ESTÁ A CORREÇÃO (Java Installer)
+          # -----------------------------------------------------------------
           - task: JavaToolInstaller@0
             displayName: 'Instalar Java $(JAVA_VERSION)'
             inputs:
               versionSpec: '$(JAVA_VERSION)'
-              jdkArchitecture: 'x64'
+              jdkArchitectureOption: 'x64' # <-- O NOME CORRETO É ESTE
               jdkSourceOption: 'PreInstalled'
 
           # Roda o Maven (clean, package, tests)
@@ -56,33 +58,23 @@ stages:
               publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml' # <--- Cumpre o requisito 7-VI
 
-          # -----------------------------------------------------------------
-          # AQUI ESTÁ A CORREÇÃO (Login no ACR)
-          # -----------------------------------------------------------------
+          # Login no Azure Container Registry (ACR)
           - task: Docker@2
             displayName: 'Login no ACR'
             inputs:
               command: 'login'
-              # NÃO usamos 'containerRegistry:'
-              # Usamos 'azureSubscription' para apontar para a conexão 'azurerm'
               azureSubscription: '$(ACR_SERVICE_CONNECTION)'
-              # E 'azureContainerRegistry' para dizer o nome do ACR
               azureContainerRegistry: '$(ACR_LOGIN_SERVER)'
 
-          # -----------------------------------------------------------------
-          # AQUI ESTÁ A SEGUNDA CORREÇÃO (Build e Push)
-          # -----------------------------------------------------------------
+          # Build da imagem Docker e Push para o ACR
           - task: Docker@2
             displayName: 'Build e Push da Imagem Docker'
             inputs:
-              command: 'buildAndPush'
+              command: 'buildAndPusg'
               repository: '$(IMAGE_NAME)'
               dockerfile: '$(DOCKERFILE_PATH)'
               buildContext: '$(PROJECT_SUBDIRECTORY)'
-              # NÃO usamos 'containerRegistry:'
-              # Usamos 'azureSubscription' novamente
               azureSubscription: '$(ACR_SERVICE_CONNECTION)'
-              # E 'azureContainerRegistry' novamente
               azureContainerRegistry: '$(ACR_LOGIN_SERVER)'
               tags: |
                 $(Build.BuildId)
@@ -96,7 +88,7 @@ stages:
               ArtifactName: 'app-jar'
               publishLocation: 'Container'
 
-  # 8. ESTÁGIO DE CD (Deploy no Web App) - Este já estava correto
+  # 8. ESTÁGIO DE CD (Deploy no Web App)
   - stage: CD_Deploy
     displayName: 'Estágio 2: Deploy no Web App'
     dependsOn: CI_Build
@@ -108,7 +100,7 @@ stages:
           - task: AzureWebAppContainer@1
             displayName: 'Deploy Web App Container'
             inputs:
-              azureSubscription: '$(AZURE_SERVICE_CONNECTION)' # <--- Usa a 'connection-sprint4'
+              azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
               appName: '$(AZURE_WEBAPP_NAME)'
               resourceGroupName: '$(AZURE_RESOURCE_GROUP)'
               imageName: '$(ACR_LOGIN_SERVER)/$(IMAGE_NAME):$(Build.BuildId)'
