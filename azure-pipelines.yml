@@ -1,7 +1,7 @@
-# azure-pipelines.yml (Versão FINAL - Corrigida e com Variáveis de Teste)
+# azure-pipelines.yml (Versão FINAL 3.0 - Corrigida para "Docker Registry")
 
 trigger:
-- main  # 1. Gatilho na branch 'main'
+  - main  # 1. Gatilho na branch 'main'
 
 variables:
   # 2. Configuração do Projeto Java
@@ -21,6 +21,8 @@ variables:
   ACR_LOGIN_SERVER: 'acrchallenge945sprint4.azurecr.io'
 
   # 6. Nomes das Service Connections
+  #    'connection-acr' (Agora é do tipo "Docker Registry")
+  #    'connection-sprint4' (É do tipo "Azure Resource Manager")
   ACR_SERVICE_CONNECTION: 'connection-acr'
   AZURE_SERVICE_CONNECTION: 'connection-sprint4'
 
@@ -30,80 +32,84 @@ pool:
 # --- ESTÁGIOS DA PIPELINE (CI e CD) ---
 stages:
 
-# 7. ESTÁGIO DE CI (Build, Teste e Push da Imagem)
-- stage: CI_Build
-  displayName: 'Estágio 1: Build, Teste e Push da Imagem'
-  jobs:
-  - job: Build
-    displayName: 'Build, Test e Docker Push'
-    steps:
+  # 7. ESTÁGIO DE CI (Build, Teste e Push da Imagem)
+  - stage: CI_Build
+    displayName: 'Estágio 1: Build, Teste e Push da Imagem'
+    jobs:
+      - job: Build
+        displayName: 'Build, Test e Docker Push'
+        steps:
 
-    # Instala o Java 17 (com a correção do 'jdkArchitectureOption')
-    - task: JavaToolInstaller@0
-      displayName: 'Instalar Java $(JAVA_VERSION)'
-      inputs:
-        versionSpec: '$(JAVA_VERSION)'
-        jdkArchitectureOption: 'x64' # <-- Correção 1
-        jdkSourceOption: 'PreInstalled'
+          # Instala o Java 17
+          - task: JavaToolInstaller@0
+            displayName: 'Instalar Java $(JAVA_VERSION)'
+            inputs:
+              versionSpec: '$(JAVA_VERSION)'
+              jdkArchitectureOption: 'x64'
+              jdkSourceOption: 'PreInstalled'
 
-    # Roda o Maven (com o bloco 'env:' para os testes)
-    - task: Maven@3
-      displayName: 'Compilar e Testar (Maven)'
-      inputs:
-        mavenPomFile: '$(MAVEN_POM_FILE)'
-        workingDirectory: '$(PROJECT_SUBDIRECTORY)'
-        goals: 'clean package'
-        publishJUnitResults: true
-        testResultsFiles: '**/surefire-reports/TEST-*.xml'
-      env: # <-- Correção 2: Passa os segredos para os testes
-        SPRING_DATASOURCE_URL: $(SPRING_DATASOURCE_URL)
-        SPRING_DATASOURCE_USERNAME: $(SPRING_DATASOURCE_USERNAME)
-        SPRING_DATASOURCE_PASSWORD: $(SPRING_DATASOURCE_PASSWORD)
-        SPRING_DATASOURCE_DRIVER_CLASS_NAME: 'com.microsoft.sqlserver.jdbc.SQLServerDriver'
+          # Roda o Maven (com o 'env:' para os testes)
+          - task: Maven@3
+            displayName: 'Compilar e Testar (Maven)'
+            inputs:
+              mavenPomFile: '$(MAVEN_POM_FILE)'
+              workingDirectory: '$(PROJECT_SUBDIRECTORY)'
+              goals: 'clean package'
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+            env:
+              SPRING_DATASOURCE_URL: $(SPRING_DATASOURCE_URL)
+              SPRING_DATASOURCE_USERNAME: $(SPRING_DATASOURCE_USERNAME)
+              SPRING_DATASOURCE_PASSWORD: $(SPRING_DATASOURCE_PASSWORD)
+              SPRING_DATASOURCE_DRIVER_CLASS_NAME: 'com.microsoft.sqlserver.jdbc.SQLServerDriver'
 
-    # Login no ACR (com a correção do 'azureSubscription')
-    - task: Docker@2
-      displayName: 'Login no ACR'
-      inputs:
-        command: 'login'
-        azureSubscription: '$(ACR_SERVICE_CONNECTION)' # <-- Correção 3
-        azureContainerRegistry: '$(ACR_LOGIN_SERVER)'
+          # -----------------------------------------------------------------
+          # AQUI ESTÁ A CORREÇÃO (Login no ACR)
+          # Voltamos a usar 'containerRegistry' porque a conexão agora é do tipo 'dockerregistry'
+          # -----------------------------------------------------------------
+          - task: Docker@2
+            displayName: 'Login no ACR'
+            inputs:
+              command: 'login'
+              containerRegistry: '$(ACR_SERVICE_CONNECTION)' # <-- CORREÇÃO
 
-    # Build e Push (com a correção do 'azureSubscription')
-    - task: Docker@2
-      displayName: 'Build e Push da Imagem Docker'
-      inputs:
-        command: 'buildAndPush'
-        repository: '$(IMAGE_NAME)'
-        dockerfile: '$(DOCKERFILE_PATH)'
-        buildContext: '$(PROJECT_SUBDIRECTORY)'
-        azureSubscription: '$(ACR_SERVICE_CONNECTION)' # <-- Correção 4
-        azureContainerRegistry: '$(ACR_LOGIN_SERVER)'
-        tags: |
-          $(Build.BuildId)
-          latest
+          # -----------------------------------------------------------------
+          # AQUI ESTÁ A SEGUNDA CORREÇÃO (Build e Push)
+          # Também usa 'containerRegistry' e corrige o 'buildAndPush'
+          # -----------------------------------------------------------------
+          - task: Docker@2
+            displayName: 'Build e Push da Imagem Docker'
+            inputs:
+              command: 'buildAndPush' # <-- CORREÇÃO 2 (typo)
+              repository: '$(IMAGE_NAME)'
+              dockerfile: '$(DOCKERFILE_PATH)'
+              buildContext: '$(PROJECT_SUBDIRECTORY)'
+              containerRegistry: '$(ACR_SERVICE_CONNECTION)' # <-- CORREÇÃO 3
+              tags: |
+                $(Build.BuildId)
+                latest
 
-    # Publica o artefato .jar
-    - task: PublishBuildArtifacts@1
-      displayName: 'Publicar Artefato (.jar)'
-      inputs:
-        PathtoPublish: '$(PROJECT_SUBDIRECTORY)/target/*.jar'
-        ArtifactName: 'app-jar'
-        publishLocation: 'Container'
+          # Publica o artefato .jar
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publicar Artefato (.jar)'
+            inputs:
+              PathtoPublish: '$(PROJECT_SUBDIRECTORY)/target/*.jar'
+              ArtifactName: 'app-jar'
+              publishLocation: 'Container'
 
-# 8. ESTÁGIO DE CD (Deploy no Web App)
-- stage: CD_Deploy
-  displayName: 'Estágio 2: Deploy no Web App'
-  dependsOn: CI_Build
-  condition: succeeded()
-  jobs:
-  - job: Deploy
-    displayName: 'Deploy no $(AZURE_WEBAPP_NAME)'
-    steps:
-    - task: AzureWebAppContainer@1
-      displayName: 'Deploy Web App Container'
-      inputs:
-        azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
-        appName: '$(AZURE_WEBAPP_NAME)'
-        resourceGroupName: '$(AZURE_RESOURCE_GROUP)'
-        imageName: '$(ACR_LOGIN_SERVER)/$(IMAGE_NAME):$(Build.BuildId)'
+  # 8. ESTÁGIO DE CD (Deploy no Web App) - Este não muda
+  - stage: CD_Deploy
+    displayName: 'Estágio 2: Deploy no Web App'
+    dependsOn: CI_Build
+    condition: succeeded()
+    jobs:
+      - job: Deploy
+        displayName: 'Deploy no $(AZURE_WEBAPP_NAME)'
+        steps:
+          - task: AzureWebAppContainer@1
+            displayName: 'Deploy Web App Container'
+            inputs:
+              azureSubscription: '$(AZURE_SERVICE_CONNECTION)' # <-- Correto (usa a 'connection-sprint4')
+              appName: '$(AZURE_WEBAPP_NAME)'
+              resourceGroupName: '$(AZURE_RESOURCE_GROUP)'
+              imageName: '$(ACR_LOGIN_SERVER)/$(IMAGE_NAME):$(Build.BuildId)'
