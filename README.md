@@ -11,7 +11,7 @@
 ## 🔗 Links de Entrega (Requisito 0)
 
 * **Aplicação (Azure Web App):** `https://webapp-challenge-945-sprint4.azurewebsites.net`
-* **Vídeo de Demonstração (YouTube):** 
+* **Vídeo de Demonstração (YouTube):** `https://youtu.be/1qbp0aDuQPA`
 * **Repositório (GitHub):** `https://github.com/vinicius945/Sprint04_Dev_Ops_And_Cloud`
 * **Projeto (Azure DevOps):** `https://dev.azure.com/RM5591830661/Sprint%204%20%E2%80%93%20Azure%20DevOps`
 
